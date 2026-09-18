@@ -1,8 +1,10 @@
 import { Router } from 'express'
-import eventRoutes from './EventRoute.js'
+import userRoutes from './UserRoute.js'
+import roleRoutes from './RoleRoute.js'
 
 const router = Router()
 
-router.use('/events', eventRoutes)
+router.use('/users', userRoutes)
+router.use('/roles', roleRoutes)
 
 export default router
