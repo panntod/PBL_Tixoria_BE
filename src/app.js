@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import routes from './routes/index.js'
 import { errorHandler } from './middlewares/ErrorMiddleware.js'
+import { logger } from './middlewares/LoggerMiddleware.js'
 
 dotenv.config()
 
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 
+app.use(logger)
 app.use('/api', routes)
 
 app.get('/', (req, res) => {
@@ -21,5 +23,5 @@ app.get('/', (req, res) => {
 app.use(errorHandler)
 
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`)
+  console.log(`[STARTING] Server is running on port ${PORT}`)
 })

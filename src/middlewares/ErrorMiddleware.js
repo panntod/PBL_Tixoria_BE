@@ -1,7 +1,12 @@
 export const errorHandler = (err, req, res, next) => {
-  console.error(err.stack)
+  console.error('[ERROR]', err.message)
+
+  if (err.stack) {
+    console.error(err.stack)
+  }
+
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Terjadi kesalahan pada server',
+    message: err.message || 'Internal Server Error',
   })
 }
