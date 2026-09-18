@@ -1,9 +1,21 @@
 {
   "name": "tixoria-api",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/app.js"
+    "dev": "node --watch src/app.js",
+    "start": "node src/app.js",
+
+    "prisma:generate": "prisma generate",
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:status": "prisma migrate status",
+    "prisma:studio": "prisma studio",
+    "prisma:db:push": "prisma db push",
+    "prisma:db:pull": "prisma db pull"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
