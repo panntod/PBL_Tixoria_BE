@@ -38,20 +38,20 @@ model Role {
 
 model Event {
   id               String   @id @default(uuid()) @db.Uuid
-  ownerId          String   @map("Owner_id") @db.Uuid
+  ownerId          String   @map("owner_id") @db.Uuid
   judulEvent       String   @map("judul_event")
   deskripsi        String
   tanggalMulai     DateTime @map("tanggal_mulai")
   tanggalSelesai   DateTime @map("tanggal_selesai")
   lokasi           String 
   bannerUrl        String   @map("banner_url")
-  statusVerifikasi Boolean  @map("status_verifikasi")
+  statusVerifikasi String @default("PENDING")  @map("status_verifikasi")
   createdAt        DateTime @default(now()) @map("created_at")
 
   owner       User         @relation("EventOwner", fields: [ownerId], references: [id])
   tickets     Ticket[]
   rabDetails  RABDetail[]
-  committees  Committe[]
+  committees  Committee[]
 
   @@index([ownerId])
   @@map("events")
@@ -61,7 +61,7 @@ model Ticket {
   id              String   @id @default(uuid()) @db.Uuid
   eventId         String   @map("event_id") @db.Uuid
   userId          String   @map("user_id") @db.Uuid
-  kodeTiket       String   @map("kode_tiket")
+  kodeTiket       String   @map("kode_tiket") @unique
   statusKehadiran Boolean  @map("status_kehadiran")
   waktuDaftar     DateTime @map("waktu_daftar")
 
@@ -73,7 +73,7 @@ model Ticket {
   @@map("tickets")
 }
 
-model Committe {
+model Committee {
   id            String @id @default(uuid()) @db.Uuid
   eventId       String @map("event_id") @db.Uuid
   namaPanitia   String @map("nama_panitia")
