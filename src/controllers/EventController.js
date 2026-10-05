@@ -1,9 +1,10 @@
 import prisma from '../config/prisma.js'
+import { sendSuccess } from '../utils/responseFormatter.js'
 
 // 1. Pengajuan Event Baru oleh Event Owner
 export const createEvent = async (req, res, next) => {
   try {
-    const ownerId = req.user.id // Diambil dari JWT Token via AuthMiddleware
+    const ownerId = req.user.id
     const {
       judulEvent,
       deskripsi,
@@ -11,8 +12,8 @@ export const createEvent = async (req, res, next) => {
       tanggalSelesai,
       lokasi,
       bannerUrl,
-      rabDetails, // Array of Object [{ namaItem, kategori, jumlahUnit, estimasiBiaya }]
-      committees, // Array of Object [{ namaPanitia, posisiJabatan, kontak }]
+      rabDetails,
+      committees,
     } = req.body
 
     const newEvent = await prisma.event.create({
@@ -25,7 +26,6 @@ export const createEvent = async (req, res, next) => {
         lokasi,
         bannerUrl,
         statusVerifikasi: 'PENDING',
-        // Menyimpan anak tabel otomatis (Nested Writes)
         rabDetails: {
           create: rabDetails || [],
         },
@@ -39,17 +39,13 @@ export const createEvent = async (req, res, next) => {
       },
     })
 
-    res.status(201).json({
-      success: true,
-      message: 'Pengajuan event berhasil dikirim!',
-      data: newEvent,
-    })
+    return sendSuccess(res, 201, 'Pengajuan event berhasil dikirim!', newEvent)
   } catch (error) {
     next(error)
   }
 }
 
-// 2. Mengambil Semua Event yang Sudah Disetujui (Untuk Publik/Peserta)
+// 2. Mengambil Semua Event yang Sudah Disetujui (Publik)
 export const getApprovedEvents = async (req, res, next) => {
   try {
     const events = await prisma.event.findMany({
@@ -62,7 +58,7 @@ export const getApprovedEvents = async (req, res, next) => {
       orderBy: { tanggalMulai: 'asc' },
     })
 
-    res.status(200).json({ success: true, data: events })
+    return sendSuccess(res, 200, 'Daftar event yang disetujui berhasil diambil', events)
   } catch (error) {
     next(error)
   }
@@ -72,13 +68,12 @@ export const getApprovedEvents = async (req, res, next) => {
 export const verifyEvent = async (req, res, next) => {
   try {
     const { id } = req.params
-    const { status } = req.body // Expect: 'APPROVED' atau 'REJECTED'
+    const { status } = req.body
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status verifikasi hanya boleh APPROVED atau REJECTED',
-      })
+      const error = new Error('Status verifikasi hanya boleh APPROVED atau REJECTED')
+      error.statusCode = 400
+      throw error
     }
 
     const updatedEvent = await prisma.event.update({
@@ -86,22 +81,17 @@ export const verifyEvent = async (req, res, next) => {
       data: { statusVerifikasi: status },
     })
 
-    res.status(200).json({
-      success: true,
-      message: `Status event berhasil diubah menjadi ${status}`,
-      data: updatedEvent,
-    })
+    return sendSuccess(res, 200, `Status event berhasil diubah menjadi ${status}`, updatedEvent)
   } catch (error) {
     next(error)
   }
 }
 
-// Menampilkan Statistik & Ringkasan Event
+// 4. Menampilkan Statistik & Ringkasan Event
 export const getEventDashboard = async (req, res, next) => {
   try {
     const { id: eventId } = req.params
 
-    // 1. Ambil Data Event beserta RAB & Panitia
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
@@ -111,13 +101,11 @@ export const getEventDashboard = async (req, res, next) => {
     })
 
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event tidak ditemukan!',
-      })
+      const error = new Error('Event tidak ditemukan!')
+      error.statusCode = 404
+      throw error
     }
 
-    // 2. Hitung Total Peserta Mendaftar & Total Peserta Hadir
     const totalPendaftar = await prisma.ticket.count({
       where: { eventId },
     })
@@ -126,24 +114,83 @@ export const getEventDashboard = async (req, res, next) => {
       where: { eventId, statusKehadiran: true },
     })
 
-    // 3. Hitung Total Estimasi Biaya RAB
     const totalEstimasiRAB = event.rabDetails.reduce(
       (acc, item) => acc + item.estimasiBiaya,
       0
     )
 
-    res.status(200).json({
-      success: true,
-      data: {
-        event,
-        statistik: {
-          totalPendaftar,
-          totalHadir,
-          persentaseKehadiran: totalPendaftar > 0 ? `${((totalHadir / totalPendaftar) * 100).toFixed(1)}%` : '0%',
-          totalEstimasiRAB,
-        },
+    const dashboardData = {
+      event,
+      statistik: {
+        totalPendaftar,
+        totalHadir,
+        persentaseKehadiran: totalPendaftar > 0 ? `${((totalHadir / totalPendaftar) * 100).toFixed(1)}%` : '0%',
+        totalEstimasiRAB,
       },
+    }
+
+    return sendSuccess(res, 200, 'Dashboard event berhasil diambil', dashboardData)
+  } catch (error) {
+    next(error)
+  }
+}
+
+// 5. Mengambil Detail Event Berdasarkan ID
+export const getEventById = async (req, res, next) => {
+  try {
+    const { id } = req.params
+
+    const event = await prisma.event.findUnique({
+      where: { id },
     })
+
+    if (!event) {
+      const error = new Error('Event dengan ID tersebut tidak ditemukan!')
+      error.statusCode = 404
+      throw error
+    }
+
+    return sendSuccess(res, 200, 'Detail event berhasil ditemukan', event)
+  } catch (error) {
+    if (error.code === 'P2023' || error.message.includes('UUID')) {
+      error.statusCode = 400
+      error.message = 'Format ID event tidak valid!'
+    }
+    next(error)
+  }
+}
+
+// 6. Mengambil Semua Event dengan Pagination
+export const getAllEvents = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const [events, total] = await Promise.all([
+      prisma.event.findMany({
+        skip,
+        take: Number(limit),
+        include: {
+          owner: {
+            select: {
+              nama: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.event.count(),
+    ])
+
+    const pagination = {
+      current_page: Number(page),
+      per_page: Number(limit),
+      total_data: total,
+      total_pages: Math.ceil(total / Number(limit)),
+    }
+
+    return sendSuccess(res, 200, 'Daftar event berhasil diambil', events, pagination)
   } catch (error) {
     next(error)
   }
