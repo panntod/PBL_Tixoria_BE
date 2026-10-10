@@ -14,6 +14,7 @@ export const createEvent = async (req, res, next) => {
       bannerUrl,
       rabDetails,
       committees,
+      rundowns,
     } = req.body
 
     const newEvent = await prisma.event.create({
@@ -32,10 +33,20 @@ export const createEvent = async (req, res, next) => {
         committees: {
           create: committees || [],
         },
+        rundowns: { // <-- 2. Simpan otomatis ke tabel rundowns
+          create: (rundowns || []).map((item) => ({
+            waktuMulai: new Date(item.waktuMulai),
+            waktuSelesai: new Date(item.waktuSelesai),
+            judulSesi: item.judulSesi,
+            pembicara: item.pembicara,
+            keterangan: item.keterangan,
+          })),
+        },
       },
       include: {
         rabDetails: true,
         committees: true,
+        rundowns: true,
       },
     })
 
@@ -142,6 +153,14 @@ export const getEventById = async (req, res, next) => {
 
     const event = await prisma.event.findUnique({
       where: { id },
+      include: {
+        owner: { select: { nama: true, email: true } },
+        rabDetails: true,
+        committees: true,
+        rundowns: {
+          orderBy: { waktuMulai: 'asc' }, // Urutkan rundown dari jam yang paling awal
+        },
+      },
     })
 
     if (!event) {

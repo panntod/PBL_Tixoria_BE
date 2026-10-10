@@ -2,7 +2,6 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Buat data role dasar jika belum ada
   const roles = [
     { kode: 'ADMIN', nama: 'Admin Kampus', description: 'Pengelola & Verifikator Sistem' },
     { kode: 'EVENT_OWNER', nama: 'Event Owner', description: 'Penyelenggara Acara / Ormawa' },
