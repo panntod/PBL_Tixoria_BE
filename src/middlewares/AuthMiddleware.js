@@ -37,3 +37,18 @@ export const authorizeRoles = (...allowedRoles) => {
     next()
   }
 }
+
+// Tambahkan middleware pengecekan role Admin berikut:
+export const isAdmin = (req, res, next) => {
+  try {
+    // Memastikan user sudah terautentikasi dan memiliki role ADMIN
+    if (!req.user || req.user.role !== 'ADMIN') {
+      const err = new Error('Akses ditolak! Hanya Admin yang memiliki izin untuk mengakses resource ini.')
+      err.statusCode = 403
+      throw err
+    }
+    next()
+  } catch (error) {
+    next(error)
+  }
+}

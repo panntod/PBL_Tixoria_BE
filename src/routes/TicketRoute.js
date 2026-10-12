@@ -3,6 +3,7 @@ import {
   registerTicket,
   getMyTickets,
   scanTicket,
+  getTicketById,
 } from '../controllers/TicketController.js'
 import { authenticate, authorizeRoles } from '../middlewares/AuthMiddleware.js'
 
@@ -11,6 +12,7 @@ const router = Router()
 // Semua endpoint tiket memerlukan login (authenticate)
 router.post('/register', authenticate, registerTicket)
 router.get('/my-tickets', authenticate, getMyTickets)
+router.get('/:id', authenticate, getTicketById)
 
 // Scan QR hanya boleh dilakukan oleh Admin atau Event Owner
 router.patch('/scan', authenticate, authorizeRoles('ADMIN', 'EVENT_OWNER'), scanTicket)

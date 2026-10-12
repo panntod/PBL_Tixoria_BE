@@ -8,6 +8,8 @@ export const createEvent = async (req, res, next) => {
     const {
       judulEvent,
       deskripsi,
+      kategori = 'Seminar',
+      kuota = 100,
       tanggalMulai,
       tanggalSelesai,
       lokasi,
@@ -22,6 +24,8 @@ export const createEvent = async (req, res, next) => {
         ownerId,
         judulEvent,
         deskripsi,
+        kategori,
+        kuota: Number(kuota),
         tanggalMulai: new Date(tanggalMulai),
         tanggalSelesai: new Date(tanggalSelesai),
         lokasi,
@@ -33,7 +37,7 @@ export const createEvent = async (req, res, next) => {
         committees: {
           create: committees || [],
         },
-        rundowns: { // <-- 2. Simpan otomatis ke tabel rundowns
+        rundowns: {
           create: (rundowns || []).map((item) => ({
             waktuMulai: new Date(item.waktuMulai),
             waktuSelesai: new Date(item.waktuSelesai),
@@ -56,20 +60,43 @@ export const createEvent = async (req, res, next) => {
   }
 }
 
-// 2. Mengambil Semua Event yang Sudah Disetujui (Publik)
+// 2. Mengambil Semua Event yang Sudah Disetujui (Publik + Search + Filter Kategori + Sort)
 export const getApprovedEvents = async (req, res, next) => {
   try {
+    const { search, kategori, sortBy } = req.query
+
+    const whereCondition = {
+      statusVerifikasi: 'APPROVED',
+      ...(kategori && kategori !== 'Semua' && { kategori }),
+      ...(search && {
+        OR: [
+          { judulEvent: { contains: search, mode: 'insensitive' } },
+          { deskripsi: { contains: search, mode: 'insensitive' } },
+          { lokasi: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    }
+
     const events = await prisma.event.findMany({
-      where: { statusVerifikasi: 'APPROVED' },
+      where: whereCondition,
       include: {
         owner: {
           select: { nama: true, email: true },
         },
+        _count: {
+          select: { tickets: { where: { statusTiket: 'AKTIF' } } },
+        },
       },
-      orderBy: { tanggalMulai: 'asc' },
+      orderBy: sortBy === 'terdekat' ? { tanggalMulai: 'asc' } : { createdAt: 'desc' },
     })
 
-    return sendSuccess(res, 200, 'Daftar event yang disetujui berhasil diambil', events)
+    const formattedEvents = events.map((event) => ({
+      ...event,
+      totalPendaftar: event._count.tickets,
+      sisaKuota: Math.max(0, event.kuota - event._count.tickets),
+    }))
+
+    return sendSuccess(res, 200, 'Daftar event yang disetujui berhasil diambil', formattedEvents)
   } catch (error) {
     next(error)
   }
@@ -118,15 +145,15 @@ export const getEventDashboard = async (req, res, next) => {
     }
 
     const totalPendaftar = await prisma.ticket.count({
-      where: { eventId },
+      where: { eventId, statusTiket: 'AKTIF' },
     })
 
     const totalHadir = await prisma.ticket.count({
-      where: { eventId, statusKehadiran: true },
+      where: { eventId, statusKehadiran: true, statusTiket: 'AKTIF' },
     })
 
     const totalEstimasiRAB = event.rabDetails.reduce(
-      (acc, item) => acc + item.estimasiBiaya,
+      (acc, item) => acc + Number(item.estimasiBiaya),
       0
     )
 
@@ -137,6 +164,7 @@ export const getEventDashboard = async (req, res, next) => {
         totalHadir,
         persentaseKehadiran: totalPendaftar > 0 ? `${((totalHadir / totalPendaftar) * 100).toFixed(1)}%` : '0%',
         totalEstimasiRAB,
+        sisaKuota: Math.max(0, event.kuota - totalPendaftar),
       },
     }
 
@@ -158,7 +186,10 @@ export const getEventById = async (req, res, next) => {
         rabDetails: true,
         committees: true,
         rundowns: {
-          orderBy: { waktuMulai: 'asc' }, // Urutkan rundown dari jam yang paling awal
+          orderBy: { waktuMulai: 'asc' },
+        },
+        _count: {
+          select: { tickets: { where: { statusTiket: 'AKTIF' } } },
         },
       },
     })
@@ -169,7 +200,13 @@ export const getEventById = async (req, res, next) => {
       throw error
     }
 
-    return sendSuccess(res, 200, 'Detail event berhasil ditemukan', event)
+    const eventDetail = {
+      ...event,
+      totalPendaftar: event._count.tickets,
+      sisaKuota: Math.max(0, event.kuota - event._count.tickets),
+    }
+
+    return sendSuccess(res, 200, 'Detail event berhasil ditemukan', eventDetail)
   } catch (error) {
     if (error.code === 'P2023' || error.message.includes('UUID')) {
       error.statusCode = 400

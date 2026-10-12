@@ -17,7 +17,7 @@ app.use(logger)
 app.use('/api', routes)
 
 app.get('/', (req, res) => {
-  res.send('API Tixoria siap digunakan 🚀')
+  res.send('API Tixoria siap digunakan')
 })
 
 app.use(errorHandler)
